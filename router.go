@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -46,23 +45,21 @@ func processOptions() (events.APIGatewayProxyResponse, error) {
 func processGet(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	word, wordParam := req.PathParameters["word"]
 
-	log.Println("req.PathParameters:", req.PathParameters)
 	if wordParam {
-		log.Println("word:", word)
+		return processCheckWord(ctx, word)
 	} else {
 		return processGetRandom(ctx)
 	}
-	return clientError(400)
 }
 
 func processGetRandom(ctx context.Context) (events.APIGatewayProxyResponse, error) {
-	entity, err := getRandomEntity(ctx)
+	word, err := getRandomWord(ctx)
 	if err != nil {
 		return serverError(err)
 	}
 
 	response := ResponseStructure{
-		Data:         entity,
+		Data:         word,
 		ErrorMessage: nil,
 	}
 
@@ -78,32 +75,25 @@ func processGetRandom(ctx context.Context) (events.APIGatewayProxyResponse, erro
 	}, nil
 }
 
-// func processGetEntityById(ctx context.Context, id string) (events.APIGatewayProxyResponse, error) {
-// 	log.Printf("Received GET entity request with id = %s", id)
+func processCheckWord(ctx context.Context, word string) (events.APIGatewayProxyResponse, error) {
+	validity, err := checkWord(ctx, word)
+	if err != nil {
+		return serverError(err)
+	}
 
-// 	entity, err := getEntity(ctx, id)
-// 	if err != nil {
-// 		return serverError(err)
-// 	}
+	response := ResponseStructure{
+		Data:         validity,
+		ErrorMessage: nil,
+	}
 
-// 	if entity == nil {
-// 		return clientError(http.StatusNotFound)
-// 	}
+	responseJson, err := json.Marshal(response)
+	if err != nil {
+		return serverError(err)
+	}
 
-// 	response := ResponseStructure{
-// 		Data:         entity,
-// 		ErrorMessage: nil,
-// 	}
-
-// 	responseJson, err := json.Marshal(response)
-// 	if err != nil {
-// 		return serverError(err)
-// 	}
-// 	log.Printf("Successfully fetched entity %s", response.Data)
-
-// 	return events.APIGatewayProxyResponse{
-// 		StatusCode: http.StatusOK,
-// 		Body:       string(responseJson),
-// 		Headers:    headers,
-// 	}, nil
-// }
+	return events.APIGatewayProxyResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(responseJson),
+		Headers:    headers,
+	}, nil
+}

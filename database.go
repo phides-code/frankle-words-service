@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
+	"slices"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -13,15 +14,8 @@ import (
 )
 
 type Entity struct {
-	// example database table structure:
 	Id   int    `json:"id" dynamodbav:"id"`
 	Word string `json:"word" dynamodbav:"word"`
-	// adjust fields as needed
-}
-
-type NewOrUpdatedEntity struct {
-	Word string `json:"description" validate:"required"`
-	// adjust fields as needed
 }
 
 func getClient() (dynamodb.Client, error) {
@@ -32,45 +26,40 @@ func getClient() (dynamodb.Client, error) {
 	return dbClient, err
 }
 
-func getRandomId(numberOfItems int) int {
-	randomId := rand.Intn(numberOfItems) // Generates a random integer in the range [0, numberOfItems)
-	randomId++                           // Adjust the index to be in the range [1, numberOfItems]
+func getRandomWord(ctx context.Context) (*Entity, error) {
+	itemCount, err := getWordCount(ctx)
 
-	return randomId
-}
-
-func getRandomEntity(ctx context.Context) (*Entity, error) {
-	numberOfItems, err := getItemCount(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	randomId := getRandomId(numberOfItems)
+	randomId := getRandomId(itemCount)
 
-	entity, err := getEntity(ctx, randomId)
+	word, err := getWordById(ctx, randomId)
 	if err != nil {
 		return nil, err
 	}
 
-	return entity, nil
+	return word, nil
 }
 
-func getItemCount(ctx context.Context) (int, error) {
+func getWordCount(ctx context.Context) (int, error) {
 	input := &dynamodb.DescribeTableInput{
-		TableName: aws.String("AppnameApples"),
+		TableName: aws.String(TableName),
 	}
 
 	result, err := db.DescribeTable(ctx, input)
 	if err != nil {
 		return 0, err
 	}
-
-	count := result.Table.ItemCount
-
-	return int(*count), nil
+	return int(*result.Table.ItemCount), nil
 }
 
-func getEntity(ctx context.Context, id int) (*Entity, error) {
+func getRandomId(itemCount int) int {
+	return rand.Intn(itemCount) + 1
+}
+
+func getWordById(ctx context.Context, id int) (*Entity, error) {
 	key, err := attributevalue.Marshal(id)
 	if err != nil {
 		return nil, err
@@ -83,22 +72,69 @@ func getEntity(ctx context.Context, id int) (*Entity, error) {
 		},
 	}
 
-	log.Printf("Calling DynamoDB with input: %v", input)
 	result, err := db.GetItem(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Executed GetEntity DynamoDb successfully. Result: %#v", result)
 
 	if result.Item == nil {
 		return nil, nil
 	}
 
-	entity := new(Entity)
-	err = attributevalue.UnmarshalMap(result.Item, entity)
+	word := new(Entity)
+	err = attributevalue.UnmarshalMap(result.Item, word)
 	if err != nil {
 		return nil, err
 	}
 
-	return entity, nil
+	return word, nil
+}
+
+func checkWord(ctx context.Context, word string) (bool, error) {
+	allWords, err := listEntities(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	// find word in allWords
+	index := slices.IndexFunc(allWords, func(item Entity) bool { return item.Word == strings.ToUpper(word) })
+
+	if index == -1 {
+		return false, nil
+	} else {
+		return true, nil
+	}
+}
+
+func listEntities(ctx context.Context) ([]Entity, error) {
+	entities := make([]Entity, 0)
+
+	var token map[string]types.AttributeValue
+
+	for {
+		input := &dynamodb.ScanInput{
+			TableName:         aws.String(TableName),
+			ExclusiveStartKey: token,
+		}
+
+		result, err := db.Scan(ctx, input)
+		if err != nil {
+			return nil, err
+		}
+
+		var fetchedEntity []Entity
+		err = attributevalue.UnmarshalListOfMaps(result.Items, &fetchedEntity)
+		if err != nil {
+			return nil, err
+		}
+
+		entities = append(entities, fetchedEntity...)
+		token = result.LastEvaluatedKey
+		if token == nil {
+			break
+		}
+
+	}
+
+	return entities, nil
 }

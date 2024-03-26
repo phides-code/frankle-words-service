@@ -9,6 +9,7 @@ import (
 )
 
 func clientError(status int) (events.APIGatewayProxyResponse, error) {
+	log.Println("send client error")
 
 	errorString := http.StatusText(status)
 
@@ -27,7 +28,7 @@ func clientError(status int) (events.APIGatewayProxyResponse, error) {
 }
 
 func serverError(err error) (events.APIGatewayProxyResponse, error) {
-	log.Println(err.Error())
+	log.Println("send server error:", err.Error())
 
 	errorString := http.StatusText(http.StatusInternalServerError)
 
