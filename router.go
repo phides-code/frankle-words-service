@@ -59,7 +59,7 @@ func processGetRandom(ctx context.Context) (events.APIGatewayProxyResponse, erro
 	}
 
 	response := ResponseStructure{
-		Data:         word,
+		Data:         word.Word,
 		ErrorMessage: nil,
 	}
 
