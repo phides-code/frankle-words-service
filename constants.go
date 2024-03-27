@@ -1,7 +1,7 @@
 package main
 
 // replace with frontend app URL
-const OriginURL = "http://localhost:3000"
+const OriginURL = "https://frankle.phil-code.com"
 
 // replace with table name
 const TableName = "FrankleWords"
