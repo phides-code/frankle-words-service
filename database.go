@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,7 +15,7 @@ import (
 )
 
 type Entity struct {
-	Id   int    `json:"id" dynamodbav:"id"`
+	Id   string `json:"id" dynamodbav:"id"`
 	Word string `json:"word" dynamodbav:"word"`
 }
 
@@ -44,15 +45,17 @@ func getRandomWord(ctx context.Context) (*Entity, error) {
 }
 
 func getWordCount(ctx context.Context) (int, error) {
-	input := &dynamodb.DescribeTableInput{
+	input := &dynamodb.ScanInput{
 		TableName: aws.String(TableName),
+		Select:    types.SelectCount,
 	}
 
-	result, err := db.DescribeTable(ctx, input)
+	result, err := db.Scan(ctx, input)
 	if err != nil {
 		return 0, err
 	}
-	return int(*result.Table.ItemCount), nil
+
+	return int(result.Count), nil
 }
 
 func getRandomId(itemCount int) int {
@@ -60,7 +63,8 @@ func getRandomId(itemCount int) int {
 }
 
 func getWordById(ctx context.Context, id int) (*Entity, error) {
-	key, err := attributevalue.Marshal(id)
+	idString := strconv.Itoa(id)
+	key, err := attributevalue.Marshal(idString)
 	if err != nil {
 		return nil, err
 	}

@@ -11,7 +11,8 @@ Resources:
       Cors:
         AllowMethods: "'OPTIONS, GET'"
         AllowHeaders: "'Content-Type'"
-        AllowOrigin: "'https://frankle.phil-code.com'" # replace with frontend app URL
+        AllowOrigin: "'https://frankle.phil-code.com'"
+        # AllowOrigin: "'http://localhost:3000'"
 
   FrankleWordsFunction:
     Type: AWS::Serverless::Function
